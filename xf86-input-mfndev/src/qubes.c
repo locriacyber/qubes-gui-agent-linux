@@ -636,11 +636,10 @@ static void process_request(int fd, InputInfoPtr pInfo)
         if (!motion_init) {
             motion_init = true;
             xf86PostMotionEvent(pInfo->dev, true, 0, 2, 0, 0); // set mouse to 0, 0 first
-        } else {
-            int dx = cmd.arg1 - lastx, dy = cmd.arg2 - lasty;
-            lastx = cmd.arg1; lasty = cmd.arg2;
-            xf86PostMotionEvent(pInfo->dev, false, 0, 2, dx, dy);
         }
+        int dx = cmd.arg1 - lastx, dy = cmd.arg2 - lasty;
+        lastx = cmd.arg1; lasty = cmd.arg2;
+        xf86PostMotionEvent(pInfo->dev, false, 0, 2, dx, dy);
         break;
     case 'K':
         xf86PostKeyboardEvent(pInfo->dev, cmd.arg1, cmd.arg2);

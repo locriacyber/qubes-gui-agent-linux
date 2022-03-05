@@ -47,6 +47,7 @@
 #include "config.h"
 #endif
 
+#include <stdbool.h>
 #include <linux/input.h>
 #include <linux/types.h>
 
@@ -629,7 +630,17 @@ static void process_request(int fd, InputInfoPtr pInfo)
         xf86PostButtonEvent(pInfo->dev, 0, cmd.arg1, cmd.arg2, 0,0);
         break;
     case 'M':
-        xf86PostMotionEvent(pInfo->dev, 1, 0, 2, cmd.arg1, cmd.arg2);
+        static bool motion_init = false;
+        static int lastx = 0;
+        static int lasty = 0;
+        if (!motion_init) {
+            motion_init = true;
+            xf86PostMotionEvent(pInfo->dev, true, 0, 2, 0, 0); // set mouse to 0, 0 first
+        } else {
+            int dx = cmd.arg1 - lastx, dy = cmd.arg2 - lasty;
+            lastx = cmd.arg1; lasty = cmd.arg2;
+            xf86PostMotionEvent(pInfo->dev, false, 0, 2, dx, dy);
+        }
         break;
     case 'K':
         xf86PostKeyboardEvent(pInfo->dev, cmd.arg1, cmd.arg2);

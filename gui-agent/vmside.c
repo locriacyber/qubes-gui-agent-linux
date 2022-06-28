@@ -1676,7 +1676,7 @@ static void handle_focus_helper(Ghandles * g, XID winid, struct msg_focus msg);
 static void try_to_focus(Ghandles * g, XID window)
 {
     SKIP_NONMANAGED_WINDOW;
-    bool parent_has_focus = true;
+    bool has_focus = true;
 
     // TODO: check if the parent has focus
     // The window may have hierarchy, where context menu may have focus
@@ -1685,11 +1685,14 @@ static void try_to_focus(Ghandles * g, XID window)
     //   +-Context Menu
 
     // the commented code is wrong (only works for "decorated" window)
-    // int _return_to;
-    // XID focused_winid;
-    // XGetInputFocus(g->display, &focused_winid, &_return_to);
+    {
+        int _return_to;
+        XID focused_winid;
+        XGetInputFocus(g->display, &focused_winid, &_return_to);
+        has_focus = window == focused_winid;
+    }
     
-    if (!parent_has_focus) {
+    if (!has_focus) {
         struct msg_focus msg_focusin;
         msg_focusin.type = FocusIn;
         msg_focusin.mode = NotifyNormal;

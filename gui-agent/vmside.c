@@ -1673,10 +1673,17 @@ static void handle_keypress(Ghandles * g, XID UNUSED(winid))
 
 static void handle_focus_helper(Ghandles * g, XID winid, struct msg_focus msg);
 
-static void try_to_focus(Ghandles * g, XID window)
+static void try_to_focus(Ghandles * g, XID winid)
 {
-    SKIP_NONMANAGED_WINDOW;
-    bool parent_has_focus = true;
+    bool input_hint = false;
+    struct genlist *l;
+    if ( (l=list_lookup(windows_list, winid)) && (l->data) )
+        input_hint = ((struct window_data*)l->data)->input_hint;
+    else {
+        fprintf(stderr, "WARNING try_to_focus: unmanaged Window 0x%x", (int)winid);
+        input_hint = true;
+    }
+    if (!input_hint) return;
 
     // TODO: check if the parent has focus
     // The window may have hierarchy, where context menu may have focus
@@ -1685,16 +1692,16 @@ static void try_to_focus(Ghandles * g, XID window)
     //   +-Context Menu
 
     // the commented code is wrong (only works for "decorated" window)
-    // int _return_to;
-    // XID focused_winid;
-    // XGetInputFocus(g->display, &focused_winid, &_return_to);
+    int _return_to;
+    XID focused_winid;
+    XGetInputFocus(g->display, &focused_winid, &_return_to);
     
-    if (!parent_has_focus) {
+    if (focused_winid != winid) {
         struct msg_focus msg_focusin;
         msg_focusin.type = FocusIn;
         msg_focusin.mode = NotifyNormal;
-        msg_focusin.detail = NotifyAncestor;
-        handle_focus_helper(g, window, msg_focusin);
+        msg_focusin.detail = NotifyNonlinear;
+        handle_focus_helper(g, winid, msg_focusin);
     }
 }
 
@@ -1718,12 +1725,15 @@ static void handle_button(Ghandles * g, XID winid)
 
     bool is_button_press = msg.type == ButtonPress;
 
-    // Fake a "focus in" when mouse down on unfocused window.
-    if (is_button_press) {
-        try_to_focus(g, winid);
-    }
-
     feed_xdriver(g, 'B', msg.button, is_button_press ? 1 : 0);
+
+    // TODO: only focus "main" window,
+    // it seems like the focus event is arrived earlier due to latency to xdriver
+    // 
+    // Fake a "focus in" when mouse down on unfocused window.
+    // if (is_button_press) {
+    //     try_to_focus(g, winid);
+    // }
 }
 
 static void handle_motion(Ghandles * g, XID winid)
@@ -1857,7 +1867,7 @@ static void handle_focus_helper(Ghandles * g, XID winid, struct msg_focus msg)
             if (input_hint) {
                 if (g->log_level > 1)
                     fprintf(stderr, "0x%x gained focus\n", (int) winid);
-                XSetInputFocus(g->display, winid, RevertToNone, g->time);
+                XSetInputFocus(g->display, winid, RevertToParent, g->time); 
             }
 
             // Do not send WM_TAKE_FOCUS if the window doesn't support it
@@ -1870,13 +1880,13 @@ static void handle_focus_helper(Ghandles * g, XID winid, struct msg_focus msg)
         if (msg.mode == NotifyNormal || msg.mode == NotifyUngrab) {
             XUngrabPointer(g->display, CurrentTime);
         }
-    } else if (msg.type == FocusOut && input_hint) {
+    } else if (msg.type == FocusOut) {
         if (msg.mode == NotifyNormal) {
             int ignore;
             XID winid_focused;
             XGetInputFocus(g->display, &winid_focused, &ignore);
             if (winid_focused == winid) {
-                XSetInputFocus(g->display, None, RevertToNone, g->time);
+                XSetInputFocus(g->display, None, RevertToParent, g->time);
                 if (g->log_level > 1)
                     fprintf(stderr, "0x%x lost focus\n", (int) winid);
             }
